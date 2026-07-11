@@ -18,7 +18,7 @@ public class SagaReplyListener {
         this.handleSagaReplyUseCase = useCase;
     }
 
-    @RabbitListener(queues = "${app.rabbitmq.topology.reply-queue}")
+    @RabbitListener(queues = "#{@sagaTopologyProperties.replyQueue}")
     public void onReply(SagaReplyMessage message) {
         handleSagaReplyUseCase.handle(new SagaReply(
                 message.sagaId(),

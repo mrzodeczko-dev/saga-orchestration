@@ -14,4 +14,5 @@ public record SagaTopologyProperties(
         String flightCommandRoutingKey,
         String hotelCommandRoutingKey,
         String paymentCommandRoutingKey
-) { }
+) {
+}
