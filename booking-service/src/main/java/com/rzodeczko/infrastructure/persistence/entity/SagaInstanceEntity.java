@@ -19,10 +19,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class SagaInstanceEntity {
     @Id
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(columnDefinition = "VARCHAR(36)")
+    @EqualsAndHashCode.Include
     private UUID id;
 
     @Column(nullable = false)

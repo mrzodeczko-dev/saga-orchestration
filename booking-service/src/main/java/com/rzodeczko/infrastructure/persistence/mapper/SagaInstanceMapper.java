@@ -1,6 +1,7 @@
 package com.rzodeczko.infrastructure.persistence.mapper;
 
 import com.rzodeczko.domain.model.saga.SagaInstance;
+import com.rzodeczko.domain.model.saga.SagaStep;
 import com.rzodeczko.infrastructure.persistence.entity.SagaInstanceEntity;
 import com.rzodeczko.infrastructure.persistence.entity.SagaStepEntity;
 import org.springframework.stereotype.Component;
