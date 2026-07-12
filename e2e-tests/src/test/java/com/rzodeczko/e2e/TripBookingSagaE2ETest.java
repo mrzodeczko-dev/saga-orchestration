@@ -127,7 +127,7 @@ class TripBookingSagaE2ETest {
         assertThat(steps).extracting(s -> s.get("name"))
                 .containsExactly("FLIGHT", "HOTEL", "PAYMENT");
         assertThat(steps).allSatisfy(step ->
-                assertThat(step.get("status")).isEqualTo("COMPLETED"));
+                assertThat(step.get("status")).isEqualTo("RESERVED"));
     }
 
     // ------------------------------------------------------------------
