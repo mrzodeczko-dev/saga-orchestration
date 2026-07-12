@@ -9,7 +9,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn clean package -DskipTests -B --no-transfer-progress
 
-RUN java -Djarmode=tools -jar target/*.jar extract --destination target/extracted
+RUN java -Djarmode=tools -jar target/hotel-service-0.0.1.jar extract --destination target/extracted
 
 # -----------------------------------------------------------------------------------------------
 # STAGE 2: RUNTIME
