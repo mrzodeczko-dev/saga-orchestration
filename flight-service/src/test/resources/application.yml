@@ -16,10 +16,6 @@ spring:
     hikari:
       maximum-pool-size: 5
 
-  sql:
-    init:
-      mode: always
-
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -27,6 +23,8 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
     open-in-view: false
+  liquibase:
+    enabled: false
 
   rabbitmq:
     addresses: localhost:5672
