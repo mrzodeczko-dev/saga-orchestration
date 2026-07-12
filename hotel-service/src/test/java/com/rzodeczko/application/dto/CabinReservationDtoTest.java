@@ -18,7 +18,13 @@ class CabinReservationDtoTest {
         var id = UUID.randomUUID();
         var sagaId = UUID.randomUUID();
         var now = Instant.now();
-        var reservation = CabinReservation.reserve(sagaId, "Jan", "Zakopane");
+        var reservation = CabinReservation.restore(
+                id,
+                sagaId,
+                "Jan",
+                "Zakopane",
+                ReservationStatus.RESERVED,
+                now);
 
         var dto = CabinReservationDto.from(reservation);
 
