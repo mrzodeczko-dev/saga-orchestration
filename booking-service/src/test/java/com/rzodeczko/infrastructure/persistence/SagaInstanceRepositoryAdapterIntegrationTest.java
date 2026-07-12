@@ -6,6 +6,8 @@ import com.rzodeczko.infrastructure.persistence.adapter.SagaInstanceRepositoryAd
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +48,7 @@ class SagaInstanceRepositoryAdapterIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @Transactional
     void shouldFindByIdForUpdate() {
         SagaInstance saga = SagaInstance.start("Lock Test", "London", new BigDecimal("3000.00"));
         repository.save(saga);
