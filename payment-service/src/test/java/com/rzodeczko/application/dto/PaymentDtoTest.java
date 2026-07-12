@@ -19,14 +19,7 @@ class PaymentDtoTest {
         var id = UUID.randomUUID();
         var sagaId = UUID.randomUUID();
         var now = Instant.now();
-        var payment = Payment.builder()
-                .id(id)
-                .sagaId(sagaId)
-                .customerName("Jan")
-                .amount(BigDecimal.valueOf(250))
-                .status(PaymentStatus.CHARGED)
-                .createdAt(now)
-                .build();
+        var payment = Payment.charge(sagaId, "Jan", BigDecimal.valueOf(250));
 
         var dto = PaymentDto.from(payment);
 
