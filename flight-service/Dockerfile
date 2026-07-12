@@ -1,13 +1,10 @@
 # -----------------------------------------------------------------------------------------------
 # STAGE 1: BUILD
 # -----------------------------------------------------------------------------------------------
-FROM maven:3.9.9-eclipse-temurin-25-alpine AS build
+FROM maven:3.9-eclipse-temurin-25-alpine AS build
 WORKDIR /build
 
 COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn dependency:resolve dependency:resolve-plugins -B --no-transfer-progress
-
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn clean package -DskipTests -B --no-transfer-progress
