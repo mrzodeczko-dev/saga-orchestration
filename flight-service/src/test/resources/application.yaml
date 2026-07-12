@@ -1,0 +1,62 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: flight-service
+
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    hikari:
+      maximum-pool-size: 5
+
+  sql:
+    init:
+      mode: always
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+
+  rabbitmq:
+    addresses: localhost:5672
+    username: guest
+    password: guest
+    virtual-host: /
+
+    template:
+      retry:
+        enabled: false
+      mandatory: false
+
+    listener:
+      simple:
+        retry:
+          enabled: false
+
+    publisher-confirm-type: none
+    publisher-returns: false
+
+app:
+  rabbitmq:
+    topology:
+      commands-exchange: x.saga.commands
+      replies-exchange: x.saga.replies
+      dlx-exchange: x.saga.dlx
+      command-queue: q.flight-service.commands
+      command-dlq: q.flight-service.commands.dlq
+      command-routing-key: flight.command
+      command-dlq-routing-key: flight.command.dlq
+      reply-routing-key: saga.reply
+    outbox:
+      poll-interval-ms: 1000
