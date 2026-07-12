@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 0
 
 spring:
   application:
@@ -59,4 +59,4 @@ app:
       command-dlq-routing-key: flight.command.dlq
       reply-routing-key: saga.reply
     outbox:
-      poll-interval-ms: 1000
+      poll-interval-ms: 100
