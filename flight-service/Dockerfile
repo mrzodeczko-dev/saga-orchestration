@@ -6,7 +6,7 @@ WORKDIR /build
 
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn dependency:go-offline -B --no-transfer-progress
+    mvn dependency:resolve dependency:resolve-plugins -B --no-transfer-progress
 
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
