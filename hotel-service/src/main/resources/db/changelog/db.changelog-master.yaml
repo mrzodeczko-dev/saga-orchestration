@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-cabin-reservations-table.yaml
+  - include:
+      file: db/changelog/changes/002-create-processed-messages-table.yaml
+  - include:
+      file: db/changelog/changes/003-create-outbox-events-table.yaml
+  - include:
+      file: db/changelog/changes/004-create-shedlock-table.yaml
