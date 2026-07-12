@@ -5,10 +5,18 @@ input:
 outputMessage:
   sentTo: "x.saga.replies"
   body:
-    sagaId: "${regex('[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}')}"
+    sagaId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     step: "FLIGHT"
     action: "RESERVE"
     status: "FAILURE"
-    reason: "${regex('.+')}"
+    reason: "No rocket seats available - passenger on watchlist"
   headers:
     contentType: "application/json"
+  matchers:
+    body:
+      - path: $.sagaId
+        type: by_regex
+        value: "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"
+      - path: $.reason
+        type: by_regex
+        value: ".+"
