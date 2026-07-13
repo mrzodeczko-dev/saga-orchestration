@@ -9,7 +9,9 @@ COPY saga-common saga-common
 COPY payment-service payment-service
 
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -pl saga-common,payment-service clean package -DskipTests --no-transfer-progress
+    mvn -B install -N --no-transfer-progress && \
+    mvn -B -f saga-common/pom.xml clean install -DskipTests --no-transfer-progress && \
+    mvn -B -f payment-service/pom.xml clean package -DskipTests --no-transfer-progress
 
 RUN java -Djarmode=tools -jar payment-service/target/payment-service-0.0.1.jar extract --destination target/extracted
 

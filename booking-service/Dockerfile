@@ -9,8 +9,11 @@ COPY pom.xml .
 COPY saga-common saga-common
 COPY booking-service booking-service
 
+# Install parent pom (non-recursive), then saga-common, then build the service
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -pl saga-common,booking-service clean package -DskipTests --no-transfer-progress
+    mvn -B install -N --no-transfer-progress && \
+    mvn -B -f saga-common/pom.xml clean install -DskipTests --no-transfer-progress && \
+    mvn -B -f booking-service/pom.xml clean package -DskipTests --no-transfer-progress
 
 RUN java -Djarmode=tools -jar booking-service/target/booking-service-0.0.1.jar extract --destination target/extracted
 

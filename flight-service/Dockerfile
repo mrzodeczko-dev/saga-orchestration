@@ -9,7 +9,9 @@ COPY saga-common saga-common
 COPY flight-service flight-service
 
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -pl saga-common,flight-service clean package -DskipTests --no-transfer-progress
+    mvn -B install -N --no-transfer-progress && \
+    mvn -B -f saga-common/pom.xml clean install -DskipTests --no-transfer-progress && \
+    mvn -B -f flight-service/pom.xml clean package -DskipTests --no-transfer-progress
 
 RUN java -Djarmode=tools -jar flight-service/target/flight-service-0.0.1.jar extract --destination target/extracted
 
