@@ -393,6 +393,7 @@ graph TB
 | Spring Boot | 4.1.0 | Application framework |
 | Spring AMQP | -- | RabbitMQ integration |
 | Spring Data JPA | -- | Database access (Hibernate + HikariCP) |
+| Liquibase | -- | Database schema management (changelogs) |
 | MySQL | 8+ | Relational database |
 | RabbitMQ | 3.13+ | Message broker (quorum queues) |
 | ShedLock | 6.0.2 | Distributed lock for outbox polling |
@@ -400,14 +401,17 @@ graph TB
 | Jackson | -- | JSON serialization/deserialization |
 | JUnit 5 | -- | Unit testing framework |
 | Mockito | -- | Mocking framework |
+| Spring Cloud Contract | 2025.1.0 | Stub provider for saga reply contracts |
 | Docker | -- | Containerization (multi-stage build) |
+| JaCoCo | 0.8.13 | Code coverage (80% line coverage gate) |
+| Validation | -- | Bean validation (Hibernate Validator) |
 | Maven | 3.9+ | Build tool and dependency management |
 
 ---
 
 ## Testing Strategy
 
-All tests are **unit tests** using **JUnit 5** and **Mockito**. Each architectural layer is tested in isolation with mocked dependencies.
+Tests include **unit tests** (JUnit 5 + Mockito), **contract tests** (Spring Cloud Contract 2025.1.0), and **JaCoCo** enforces 80% line coverage. Each architectural layer is tested in isolation with mocked dependencies.
 
 ### Domain Layer Tests
 
@@ -448,6 +452,15 @@ All tests are **unit tests** using **JUnit 5** and **Mockito**. Each architectur
 | `PaymentControllerTest` | REST endpoint routing, response codes, serialization |
 | `PaymentResponseDtoTest` | Response DTO structure |
 | `GlobalExceptionHandlerTest` | Exception-to-HTTP-response mapping |
+
+### Contract Tests (Spring Cloud Contract)
+
+This service is the **stub provider** -- it publishes reply messages consumed by the saga orchestrator (booking-service).
+
+| Test Class                    | Coverage                                                  |
+|-------------------------------|-----------------------------------------------------------|
+| `MessagingContractBaseTest`   | Base class providing trigger methods for contract stubs   |
+| `ReplyMessageContractTest`    | Reply message JSON serialization/deserialization contracts |
 
 ---
 
@@ -493,7 +506,14 @@ payment-service/
 │   │       │   └── response/               PaymentResponseDto
 │   │       └── exception/                  GlobalExceptionHandler
 │   ├── main/resources/
-│   │   └── application.yaml
+│   │   ├── application.yaml
+│   │   └── db/changelog/
+│   │       ├── db.changelog-master.yaml
+│   │       └── changes/
+│   │           ├── 001-create-payments-table.yaml
+│   │           ├── 002-create-processed-messages-table.yaml
+│   │           ├── 003-create-outbox-events-table.yaml
+│   │           └── 004-create-shedlock-table.yaml
 │   └── test/java/com/rzodeczko/
 │       ├── application/
 │       │   ├── service/                    PaymentCommandServiceTest, PaymentQueryServiceImplTest
@@ -508,6 +528,7 @@ payment-service/
 │       │   ├── persistence/                PaymentRepositoryAdapterTest, PaymentMapperTest
 │       │   └── tx/                         TransactionalPaymentCommandServiceTest,
 │       │                                   TransactionalPaymentQueryServiceTest
+│       ├── contracts/                      MessagingContractBaseTest, ReplyMessageContractTest
 │       └── presentation/
 │           ├── controller/                 PaymentControllerTest
 │           ├── dto/                        PaymentResponseDtoTest

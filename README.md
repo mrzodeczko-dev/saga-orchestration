@@ -26,6 +26,7 @@ graph LR
         API["REST API"]
         SAG["Saga Orchestrator"]
         OB1[("Outbox")]
+        LB1["Liquibase"]
         API --> SAG --> OB1
     end
 
@@ -41,6 +42,7 @@ graph LR
         F["✈️ Flight :8081"]
         H["🏨 Hotel :8082"]
         P["💳 Payment :8083"]
+        LB2["Liquibase"]
     end
 
     B_DB[("Booking DB")]
@@ -62,7 +64,11 @@ graph LR
 
     RPL -- "saga.reply" --> SAG
 
+    LB1 -. "migrations" .-> B_DB
     SAG --- B_DB
+    LB2 -. "migrations" .-> F_DB
+    LB2 -. "migrations" .-> H_DB
+    LB2 -. "migrations" .-> P_DB
     F --- F_DB
     H --- H_DB
     P --- P_DB
@@ -178,6 +184,9 @@ saga-orchestration/
 │   │       ├── controller/           # BookingController
 │   │       ├── dto/                  # StartTripBookingRequestDto, BookingResponseDto
 │   │       └── exception/            # GlobalExceptionHandler
+│   ├── src/main/resources/
+│   │   ├── application.yaml
+│   │   └── db/changelog/             # Liquibase migrations (per-service)
 │   ├── Dockerfile
 │   └── pom.xml
 ├── flight-service/                    # Saga participant (seat reservations)
@@ -207,7 +216,9 @@ saga-orchestration/
 │   ├── rabbitmq-definitions.json      # Users, vhosts, permissions
 │   └── enabled_plugins
 ├── .github/workflows/
-│   └── ci.yml                         # CI pipeline (4 services, contract tests)
+│   ├── ci.yml                         # Unit & contract tests (4 services)
+│   ├── e2e.yml                        # End-to-end tests (Docker Compose)
+│   └── dockerhub-publish-images.yml   # Publish Docker images after E2E pass
 ├── docker-compose.yml                 # Full stack (4 MySQL + 3 RabbitMQ + 4 services)
 ├── .env.example                       # All environment variables
 └── .gitignore
@@ -215,7 +226,7 @@ saga-orchestration/
 
 ## CI/CD
 
-The project uses a single GitHub Actions workflow (`ci.yml`) with three jobs. **Flight Service** builds first because it produces Spring Cloud Contract stubs consumed by Booking Service's contract tests. **Booking Service** builds next, restoring the flight stubs from cache. **Hotel Service** and **Payment Service** build in parallel with no dependencies. All jobs run unit tests, upload JaCoCo coverage reports, and upload Surefire test results as artifacts.
+The project uses three GitHub Actions workflows. **`ci.yml`** has two jobs: **Flight Service**, **Hotel Service**, and **Payment Service** build in parallel — each produces Spring Cloud Contract stubs and caches them. **Booking Service** then builds and runs contract tests against all three stub sets. All jobs upload JaCoCo coverage reports and Surefire test results as artifacts. **`e2e.yml`** spins up the full Docker Compose stack and runs end-to-end saga tests. **`dockerhub-publish-images.yml`** triggers after a successful E2E run on `master`/`develop` and publishes all four service images to Docker Hub.
 
 ## Tech Stack
 
@@ -229,8 +240,12 @@ The project uses a single GitHub Actions workflow (`ci.yml`) with three jobs. **
 | Contract Testing | Spring Cloud Contract 2025.1.0 |
 | Database | MySQL 9.6 (per-service isolation) |
 | Persistence | Spring Data JPA, HikariCP |
+| Migrations | Liquibase (Spring Boot Starter) |
+| Validation | Spring Boot Starter Validation (Hibernate Validator) |
+| Code Coverage | JaCoCo 0.8.13 (80% line coverage gate) |
+| Integration Testing | Testcontainers (MySQL, RabbitMQ), Awaitility |
 | Observability | Spring Boot Actuator |
-| Build | Maven 3.9, multi-stage Docker build |
+| Build | Maven 3.9, multi-stage Docker build with CDS extraction |
 | Containerisation | Docker, Docker Compose v2+ |
 | CI/CD | GitHub Actions |
 | Utilities | Lombok, Jackson |

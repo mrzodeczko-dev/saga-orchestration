@@ -245,7 +245,7 @@ Verify: `curl http://localhost:8080/actuator/health` -> `{"status":"UP"}`
 
 2. **RabbitMQ not reachable** -- the service requires RabbitMQ to be running and accessible at `SPRING_RABBITMQ_ADDRESSES`. Verify the virtual host exists and the credentials have permissions. Inspect with `docker compose logs rabbitmq`.
 
-3. **Outbox events not being published** -- `OutboxEventPublisher` polls every 1 000 ms and is guarded by ShedLock (`booking_outbox_publisher`, lock at most 30 s). Ensure ShedLock's database table (`shedlock`) was created by `schema.sql`. If running multiple instances, verify that only one holds the lock at a time.
+3. **Outbox events not being published** -- `OutboxEventPublisher` polls every 1 000 ms and is guarded by ShedLock (`booking_outbox_publisher`, lock at most 30 s). Ensure ShedLock's database table (`shedlock`) was created by Liquibase migrations (`db/changelog/changes/004-create-shedlock-table.yaml`). If running multiple instances, verify that only one holds the lock at a time.
 
 4. **Saga stuck in IN_PROGRESS** -- a participant service may not have sent a reply. Check the participant service logs, verify RabbitMQ queues (`q.booking-service.replies` should have no stuck messages), and inspect the DLQ (`q.booking-service.replies.dlq`) for rejected messages.
 
@@ -295,6 +295,8 @@ graph LR
         subgraph MESSAGING["Messaging"]
             OSCP[OutboxSagaCommandPublisher]
             SRL[SagaReplyListener]
+        end
+        subgraph OUTBOX["Outbox"]
             OEP[OutboxEventPublisher]
             OES[OutboxEventService]
         end
@@ -360,13 +362,15 @@ graph LR
 | Framework | Spring Boot 4.1.0 |
 | Messaging | Spring AMQP, RabbitMQ |
 | Persistence | Spring Data JPA, Hibernate (MySQLDialect), HikariCP (pool: 20) |
+| Migrations | Liquibase (Spring Boot Starter) |
 | Database | MySQL |
 | Scheduling | Spring Scheduling, ShedLock 6.0.2 |
 | Contract Testing | Spring Cloud Contract 2025.1.0 |
 | Serialization | Jackson |
-| Build | Maven 3.9 |
+| Build | Maven 3.9, JaCoCo 0.8.13 (80% line coverage gate) |
 | Testing | JUnit 5, Mockito |
-| Containerisation | Docker, multi-stage build (maven:3.9-eclipse-temurin-25-alpine -> eclipse-temurin:25-jre-alpine) |
+| Integration Testing | Testcontainers (MySQL, RabbitMQ), Awaitility |
+| Containerisation | Docker, multi-stage build with CDS extraction (maven:3.9.11-eclipse-temurin-25-alpine -> eclipse-temurin:25-jre-alpine) |
 | Observability | Spring Boot Actuator |
 | Utilities | Lombok |
 
@@ -376,7 +380,7 @@ graph LR
 ## Testing
 [Back to Table of Contents](#toc)
 
-The service has a comprehensive test suite covering the domain model, application services, infrastructure adapters, presentation layer, and consumer/producer contract verification. Unit tests use Mockito for isolation; contract tests use Spring Cloud Contract to verify message formats and consumer compatibility.
+The service has a comprehensive test suite covering the domain model, application services, infrastructure adapters, presentation layer, and consumer/producer contract verification. Unit tests use Mockito for isolation; integration tests use Testcontainers (MySQL, RabbitMQ) and Awaitility; contract tests use Spring Cloud Contract to verify message formats and consumer compatibility.
 
 ### Running Tests
 
@@ -499,6 +503,56 @@ mvn test
 |------|----------|
 | reply consumption | verifies that the orchestrator correctly consumes reply messages against flight-service contract stubs |
 
+##### `HotelReplyConsumerContractTest`
+
+| Test | Scenario |
+|------|----------|
+| reply consumption | verifies that the orchestrator correctly consumes reply messages against hotel-service contract stubs |
+
+##### `PaymentReplyConsumerContractTest`
+
+| Test | Scenario |
+|------|----------|
+| reply consumption | verifies that the orchestrator correctly consumes reply messages against payment-service contract stubs |
+
+#### Integration Tests
+
+##### `SagaFlowIntegrationTest`
+
+| Test | Scenario |
+|------|----------|
+| end-to-end saga flow | Full saga lifecycle with Testcontainers (MySQL + RabbitMQ) |
+
+##### `OutboxEventServiceIntegrationTest`
+
+| Test | Scenario |
+|------|----------|
+| outbox persistence | Outbox event serialization and persistence with real database |
+
+##### `OutboxEventPublisherIntegrationTest`
+
+| Test | Scenario |
+|------|----------|
+| outbox publishing | Outbox polling and RabbitMQ publishing with real broker |
+
+##### `SagaTopologyIntegrationTest`
+
+| Test | Scenario |
+|------|----------|
+| topology declaration | RabbitMQ exchange/queue topology verification |
+
+##### `SagaReplyListenerIntegrationTest`
+
+| Test | Scenario |
+|------|----------|
+| reply processing | End-to-end reply consumption from RabbitMQ |
+
+##### `SagaInstanceRepositoryAdapterIntegrationTest`
+
+| Test | Scenario |
+|------|----------|
+| persistence adapter | JPA persistence with real MySQL via Testcontainers |
+
 ---
 
 <a id="repository-structure"></a>
@@ -559,7 +613,13 @@ mvn test
 │   │   │   │       └── exception/            # GlobalExceptionHandler
 │   │   │   └── resources/
 │   │   │       ├── application.yaml
-│   │   │       └── schema.sql
+│   │   │       └── db/changelog/
+│   │   │           ├── db.changelog-master.yaml
+│   │   │           └── changes/
+│   │   │               ├── 001-create-saga-instances-table.yaml
+│   │   │               ├── 002-create-saga-steps-table.yaml
+│   │   │               ├── 003-create-outbox-events-table.yaml
+│   │   │               └── 004-create-shedlock-table.yaml
 │   │   └── test/
 │   │       ├── java/com/rzodeczko/
 │   │       │   ├── application/service/      # SagaOrchestratorImplTest,

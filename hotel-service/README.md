@@ -197,7 +197,7 @@ cd hotel-service
 docker build -t hotel-service:latest .
 ```
 
-The Dockerfile uses a multi-stage build (Maven build + JRE runtime), runs as a non-root user, and configures container-aware JVM settings (`-XX:+UseContainerSupport`, `-XX:MaxRAMPercentage=75.0`).
+The Dockerfile uses a multi-stage build with Spring Boot CDS extraction (Maven build + JRE runtime), runs as a non-root user, and configures container-aware JVM settings (`-XX:+UseContainerSupport`, `-XX:MaxRAMPercentage=75.0`, `-XX:+UseG1GC`, `-XX:+ExitOnOutOfMemoryError`).
 
 ---
 
@@ -372,6 +372,10 @@ graph TB
 | Mockito          | --       | Mocking framework                            |
 | Docker           | --       | Containerization (multi-stage build)         |
 | HikariCP         | --       | JDBC connection pooling (pool size 20)       |
+| Migrations       | Liquibase  | Database schema management (changelogs)  |
+| Validation       | Spring Boot Starter Validation | -- | Bean validation (Hibernate Validator) |
+| Contract Testing | Spring Cloud Contract | 2025.1.0 | Stub provider for saga reply contracts |
+| Code Coverage    | JaCoCo     | 0.8.13   | 80% line coverage gate                   |
 
 ---
 
@@ -381,7 +385,7 @@ graph TB
 
 [Back to Table of Contents](#toc)
 
-All tests are **unit tests** using **JUnit 5** and **Mockito**. Each layer of the hexagonal architecture is tested in isolation through mocked port interfaces.
+Tests include **unit tests** (JUnit 5 + Mockito), **contract tests** (Spring Cloud Contract 2025.1.0), and **JaCoCo** enforces 80% line coverage. Each layer of the hexagonal architecture is tested in isolation through mocked port interfaces.
 
 ### Domain Layer Tests
 
@@ -423,6 +427,15 @@ All tests are **unit tests** using **JUnit 5** and **Mockito**. Each layer of th
 | `CabinReservationResponseDtoTest` | Response DTO construction and mapping       |
 | `GlobalExceptionHandlerTest`      | Exception-to-HTTP-response mapping          |
 
+### Contract Tests (Spring Cloud Contract)
+
+This service is the **stub provider** -- it publishes reply messages consumed by the saga orchestrator (booking-service).
+
+| Test Class                    | Coverage                                                  |
+|-------------------------------|-----------------------------------------------------------|
+| `MessagingContractBaseTest`   | Base class providing trigger methods for contract stubs   |
+| `ReplyMessageContractTest`    | Reply message JSON serialization/deserialization contracts |
+
 ### Running Tests
 
 ```bash
@@ -460,7 +473,7 @@ hotel-service/
 │   │   │   ├── messaging/                  # HotelCommandListener, OutboxSagaReplyPublisher,
 │   │   │   │   │                           #   HotelTopologyConfig, ParticipantTopologyProperties,
 │   │   │   │   │                           #   RabbitMqConfig
-│   │   │   │   └── dto/                    # HotelCommandMessageDto, SagaReplyMessageDto
+│   │   │   │   └── dto/                    # HotelCommandMessage, SagaReplyMessage
 │   │   │   ├── outbox/                     # OutboxEventEntity, JpaOutboxEventRepository,
 │   │   │   │                               #   OutboxEventPublisher, OutboxEventService,
 │   │   │   │                               #   OutboxSerializationException
@@ -478,7 +491,14 @@ hotel-service/
 │   │       │   └── response/               # CabinReservationResponseDto
 │   │       └── exception/                  # GlobalExceptionHandler
 │   ├── main/resources/
-│   │   └── application.yaml                # Spring Boot configuration
+│   │   ├── application.yaml                # Spring Boot configuration
+│   │   └── db/changelog/
+│   │       ├── db.changelog-master.yaml
+│   │       └── changes/
+│   │           ├── 001-create-cabin-reservations-table.yaml
+│   │           ├── 002-create-processed-messages-table.yaml
+│   │           ├── 003-create-outbox-events-table.yaml
+│   │           └── 004-create-shedlock-table.yaml
 │   └── test/java/com/rzodeczko/           # Unit tests (JUnit 5 + Mockito)
 ├── Dockerfile                              # Multi-stage build (Maven + JRE)
 └── pom.xml                                 # Maven project descriptor
