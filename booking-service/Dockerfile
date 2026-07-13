@@ -4,12 +4,22 @@
 FROM maven:3.9.11-eclipse-temurin-25-alpine AS build
 WORKDIR /build
 
+# Parent pom + saga-common (dependency layer — cached until poms change)
 COPY pom.xml .
-COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn clean package -DskipTests -B --no-transfer-progress
+COPY saga-common/pom.xml saga-common/pom.xml
+COPY saga-common/src saga-common/src
+COPY booking-service/pom.xml booking-service/pom.xml
 
-RUN java -Djarmode=tools -jar target/booking-service-0.0.1.jar extract --destination target/extracted
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -pl saga-common install -DskipTests --no-transfer-progress && \
+    mvn -B -pl booking-service dependency:go-offline --no-transfer-progress || true
+
+# Service source
+COPY booking-service/src booking-service/src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -pl booking-service clean package -DskipTests --no-transfer-progress
+
+RUN java -Djarmode=tools -jar booking-service/target/booking-service-0.0.1.jar extract --destination target/extracted
 
 # -----------------------------------------------------------------------------------------------
 # STAGE 2: RUNTIME

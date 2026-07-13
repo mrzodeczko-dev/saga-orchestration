@@ -5,11 +5,19 @@ FROM maven:3.9.11-eclipse-temurin-25-alpine AS build
 WORKDIR /build
 
 COPY pom.xml .
-COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn clean package -DskipTests -B --no-transfer-progress
+COPY saga-common/pom.xml saga-common/pom.xml
+COPY saga-common/src saga-common/src
+COPY flight-service/pom.xml flight-service/pom.xml
 
-RUN java -Djarmode=tools -jar target/flight-service-0.0.1.jar extract --destination target/extracted
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -pl saga-common install -DskipTests --no-transfer-progress && \
+    mvn -B -pl flight-service dependency:go-offline --no-transfer-progress || true
+
+COPY flight-service/src flight-service/src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -pl flight-service clean package -DskipTests --no-transfer-progress
+
+RUN java -Djarmode=tools -jar flight-service/target/flight-service-0.0.1.jar extract --destination target/extracted
 
 # -----------------------------------------------------------------------------------------------
 # STAGE 2: RUNTIME

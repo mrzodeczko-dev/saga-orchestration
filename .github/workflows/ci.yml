@@ -7,10 +7,40 @@ on:
     branches: [ master, develop ]
 
 jobs:
+  build-saga-common:
+    name: saga-common
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+          cache-dependency-path: saga-common/pom.xml
+
+      - name: Set up Maven 3.9.9
+        run: |
+          wget -q https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz
+          tar xf apache-maven-3.9.9-bin.tar.gz
+          echo "$PWD/apache-maven-3.9.9/bin" >> $GITHUB_PATH
+
+      - name: Build and install saga-common
+        run: mvn -B -pl saga-common clean install
+
+      - name: Cache saga-common in local Maven repo
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository/com/rzodeczko/saga-common
+          key: saga-common-${{ github.sha }}
+
   # --- Stub providers — flight, hotel, payment budują się równolegle i instalują stuby ---
   build-stub-providers:
     name: ${{ matrix.service }} (stubs provider)
     runs-on: ubuntu-latest
+    needs: build-saga-common
     strategy:
       fail-fast: false
       matrix:
@@ -36,9 +66,14 @@ jobs:
           tar xf apache-maven-3.9.9-bin.tar.gz
           echo "$PWD/apache-maven-3.9.9/bin" >> $GITHUB_PATH
 
+      - name: Restore saga-common
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository/com/rzodeczko/saga-common
+          key: saga-common-${{ github.sha }}
+
       - name: Build, test and install stubs
-        working-directory: ${{ matrix.service }}
-        run: mvn -B clean install
+        run: mvn -B -pl ${{ matrix.service }} clean install
 
       - name: Cache stubs in local Maven repo
         uses: actions/cache/save@v4
@@ -84,6 +119,12 @@ jobs:
           tar xf apache-maven-3.9.9-bin.tar.gz
           echo "$PWD/apache-maven-3.9.9/bin" >> $GITHUB_PATH
 
+      - name: Restore saga-common
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository/com/rzodeczko/saga-common
+          key: saga-common-${{ github.sha }}
+
       - name: Restore flight-service stubs
         uses: actions/cache/restore@v4
         with:
@@ -103,8 +144,7 @@ jobs:
           key: payment-service-stubs-${{ github.sha }}
 
       - name: Build and test
-        working-directory: booking-service
-        run: mvn -B clean verify
+        run: mvn -B -pl booking-service clean verify
 
       - name: Upload JaCoCo report
         if: always()
