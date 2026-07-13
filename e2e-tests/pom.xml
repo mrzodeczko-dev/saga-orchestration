@@ -20,7 +20,6 @@
         <awaitility.version>4.3.0</awaitility.version>
         <!-- Skip by default; run with -Pe2e -->
         <skipTests>true</skipTests>
-        <java.version>25</java.version>
     </properties>
 
     <dependencyManagement>

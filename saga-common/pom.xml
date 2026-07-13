@@ -14,10 +14,6 @@
     <name>saga-common</name>
     <description>Shared infrastructure for saga services</description>
 
-    <properties>
-        <java.version>25</java.version>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
