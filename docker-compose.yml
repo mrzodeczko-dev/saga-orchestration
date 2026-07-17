@@ -245,6 +245,232 @@ services:
 
 
   # --------------------------------------------------------------------------------------------------------------------
+  # SECURITY PLATFORM — USER MYSQL
+  # --------------------------------------------------------------------------------------------------------------------
+  user-mysql:
+    image: mysql:9.6.0
+    restart: unless-stopped
+    volumes:
+      - user-mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USER_SERVICE_MYSQL_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${USER_SERVICE_MYSQL_DB_NAME}
+      MYSQL_USER: ${USER_SERVICE_MYSQL_DB_USER}
+      MYSQL_PASSWORD: ${USER_SERVICE_MYSQL_DB_PASSWORD}
+    command: >
+      --default-time-zone='+00:00'
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=${USER_SERVICE_MYSQL_INNODB_BUFFER_POOL_SIZE}
+      --max-connections=${USER_SERVICE_MYSQL_MAX_CONNECTIONS}
+    expose:
+      - "3306"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    healthcheck:
+      test: [ "CMD-SHELL", "mysql -h localhost -u $$MYSQL_USER -p$$MYSQL_PASSWORD -e \"SELECT 1 FROM information_schema.schemata WHERE schema_name='$$MYSQL_DATABASE'\"" ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - saga-network
+
+  # --------------------------------------------------------------------------------------------------------------------
+  # SECURITY PLATFORM — AUTH REDIS
+  # --------------------------------------------------------------------------------------------------------------------
+  auth-redis:
+    image: redis:8.2-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --bind 0.0.0.0
+      --protected-mode yes
+      --requirepass ${AUTH_REDIS_PASSWORD}
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - auth-redis-data:/data
+    expose:
+      - "6379"
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: "0.5"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${AUTH_REDIS_PASSWORD}", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - saga-network
+
+  # --------------------------------------------------------------------------------------------------------------------
+  # SECURITY PLATFORM — USER SERVICE
+  # --------------------------------------------------------------------------------------------------------------------
+  user-service:
+    image: mrzodeczko/security-platform-user-service:2026-06-29-v31
+    restart: on-failure:5
+    expose:
+      - "8086"
+    depends_on:
+      user-mysql:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8086
+      SPRING_DATASOURCE_URL: jdbc:mysql://${USER_SERVICE_MYSQL_DB_HOST:-user-mysql}:3306/${USER_SERVICE_MYSQL_DB_NAME:-users_db}?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${USER_SERVICE_MYSQL_DB_USER:-user}
+      SPRING_DATASOURCE_PASSWORD: ${USER_SERVICE_MYSQL_DB_PASSWORD}
+      MAIL_HOST: ${USER_SERVICE_MAIL_HOST:-smtp.gmail.com}
+      MAIL_USERNAME: ${USER_SERVICE_MAIL_USERNAME}
+      MAIL_PASSWORD: ${USER_SERVICE_MAIL_PASSWORD}
+      MAIL_PORT: ${USER_SERVICE_MAIL_PORT:-587}
+      INTERNAL_SECRET: ${SECURITY_INTERNAL_SECRET}
+      MFA_ISSUER: ${USER_SERVICE_MFA_ISSUER}
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.0"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - saga-network
+
+  # --------------------------------------------------------------------------------------------------------------------
+  # SECURITY PLATFORM — AUTH SERVICE
+  # --------------------------------------------------------------------------------------------------------------------
+  auth-service:
+    image: mrzodeczko/security-platform-auth-service:2026-06-29-v31
+    restart: on-failure:5
+    expose:
+      - "8084"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      auth-redis:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${SECURITY_JWT_SECRET}
+      JWT_ACCESS_TOKEN_EXPIRATION_MS: ${AUTH_JWT_ACCESS_TOKEN_EXPIRATION_MS:-300000}
+      JWT_REFRESH_TOKEN_EXPIRATION_MS: ${AUTH_JWT_REFRESH_TOKEN_EXPIRATION_MS:-3000000}
+      USER_SERVICE_URL: http://user-service:8086
+      INTERNAL_SECRET: ${SECURITY_INTERNAL_SECRET}
+      REDIS_HOST: ${AUTH_REDIS_HOST:-auth-redis}
+      REDIS_PORT: ${AUTH_REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${AUTH_REDIS_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - saga-network
+
+  # --------------------------------------------------------------------------------------------------------------------
+  # SECURITY PLATFORM — API GATEWAY
+  # --------------------------------------------------------------------------------------------------------------------
+  api-gateway-service:
+    image: mrzodeczko/security-platform-api-gateway-service:2026-06-29-v31
+    restart: on-failure:5
+    ports:
+      - "${API_GATEWAY_SERVICE_PORT:-8085}:8085"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      auth-redis:
+        condition: service_healthy
+      booking-service:
+        condition: service_started
+    environment:
+      JWT_SECRET: ${SECURITY_JWT_SECRET}
+      INTERNAL_SECRET: ${SECURITY_INTERNAL_SECRET}
+      AUTH_SERVICE_URL: http://auth-service:8084
+      USER_SERVICE_URL: http://user-service:8086
+      RATE_LIMIT_ENABLED: ${API_GATEWAY_RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_RPS: ${API_GATEWAY_RATE_LIMIT_RPS:-20}
+      RATE_LIMIT_BURST: ${API_GATEWAY_RATE_LIMIT_BURST:-40}
+      REDIS_HOST: ${AUTH_REDIS_HOST:-auth-redis}
+      REDIS_PORT: ${AUTH_REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${AUTH_REDIS_PASSWORD}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
+      # Routing — nadpisanie YAML przez env vars
+      GATEWAY_ROUTES_0_PREFIX: /auth
+      GATEWAY_ROUTES_0_TARGET: http://auth-service:8084
+      GATEWAY_ROUTES_1_PREFIX: /users
+      GATEWAY_ROUTES_1_TARGET: http://user-service:8086
+      GATEWAY_ROUTES_2_PREFIX: /bookings
+      GATEWAY_ROUTES_2_TARGET: http://booking-service:${BOOKING_SERVICE_PORT}
+      # Public paths — auth/users endpoints (bookings NIE — wymagają JWT)
+      GATEWAY_PUBLIC-PATHS_0: "POST:/auth/login"
+      GATEWAY_PUBLIC-PATHS_1: "POST:/auth/refresh"
+      GATEWAY_PUBLIC-PATHS_2: "POST:/auth/mfa"
+      GATEWAY_PUBLIC-PATHS_3: "POST:/auth/logout"
+      GATEWAY_PUBLIC-PATHS_4: "POST:/users"
+      GATEWAY_PUBLIC-PATHS_5: "POST:/users/code"
+      GATEWAY_PUBLIC-PATHS_6: "POST:/users/activation"
+      GATEWAY_PUBLIC-PATHS_7: "POST:/users/password/permission"
+      GATEWAY_PUBLIC-PATHS_8: "POST:/users/password/reset"
+      GATEWAY_PUBLIC-PATHS_9: "GET:/"
+      GATEWAY_PUBLIC-PATHS_10: "GET:/actuator/health"
+      GATEWAY_PUBLIC-PATHS_11: "GET:/actuator/health/liveness"
+      GATEWAY_PUBLIC-PATHS_12: "GET:/actuator/health/readiness"
+      # Admin paths
+      GATEWAY_ADMIN-PATHS_0: "PUT:/users/*/role"
+      # User paths
+      GATEWAY_USER-PATHS_0: "POST:/users/*/mfa"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - saga-network
+
+  # --------------------------------------------------------------------------------------------------------------------
   # BOOKING SERVICE
   # --------------------------------------------------------------------------------------------------------------------
   booking-service:
@@ -252,8 +478,8 @@ services:
       context: .
       dockerfile: booking-service/Dockerfile
     restart: on-failure:5
-    ports:
-      - "${BOOKING_SERVICE_PORT}:${BOOKING_SERVICE_PORT}"
+    expose:
+      - "${BOOKING_SERVICE_PORT}"
     depends_on:
       booking-mysql:
         condition: service_healthy
@@ -294,8 +520,8 @@ services:
       context: .
       dockerfile: flight-service/Dockerfile
     restart: on-failure:5
-    ports:
-      - "${FLIGHT_SERVICE_PORT}:${FLIGHT_SERVICE_PORT}"
+    expose:
+      - "${FLIGHT_SERVICE_PORT}"
     depends_on:
       flight-mysql:
         condition: service_healthy
@@ -336,8 +562,8 @@ services:
       context: .
       dockerfile: hotel-service/Dockerfile
     restart: on-failure:5
-    ports:
-      - "${HOTEL_SERVICE_PORT}:${HOTEL_SERVICE_PORT}"
+    expose:
+      - "${HOTEL_SERVICE_PORT}"
     depends_on:
       hotel-mysql:
         condition: service_healthy
@@ -378,8 +604,8 @@ services:
       context: .
       dockerfile: payment-service/Dockerfile
     restart: on-failure:5
-    ports:
-      - "${PAYMENT_SERVICE_PORT}:${PAYMENT_SERVICE_PORT}"
+    expose:
+      - "${PAYMENT_SERVICE_PORT}"
     depends_on:
       payment-mysql:
         condition: service_healthy
@@ -420,6 +646,8 @@ volumes:
   flight-mysql:
   hotel-mysql:
   payment-mysql:
+  user-mysql:
+  auth-redis-data:
 
 networks:
   saga-network:
