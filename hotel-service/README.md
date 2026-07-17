@@ -425,7 +425,7 @@ Tests include **unit tests** (JUnit 5 + Mockito), **contract tests** (Spring Clo
 |-----------------------------------|---------------------------------------------|
 | `ReservationControllerTest`       | REST endpoint request/response handling     |
 | `CabinReservationResponseDtoTest` | Response DTO construction and mapping       |
-| `GlobalExceptionHandlerTest`      | Exception-to-HTTP-response mapping          |
+| `GlobalExceptionHandlerTest`      | Exception-to-ProblemDetail (RFC 9457) mapping |
 
 ### Contract Tests (Spring Cloud Contract)
 
@@ -487,7 +487,6 @@ hotel-service/
 │   │   └── presentation/
 │   │       ├── controller/                 # ReservationController
 │   │       ├── dto/
-│   │       │   ├── error/                  # ErrorResponseDto
 │   │       │   └── response/               # CabinReservationResponseDto
 │   │       └── exception/                  # GlobalExceptionHandler
 │   ├── main/resources/

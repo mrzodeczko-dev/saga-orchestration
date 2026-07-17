@@ -166,19 +166,22 @@ sequenceDiagram
 ### cURL Examples
 
 ```bash
-# Start a trip booking saga
-curl -X POST http://localhost:8080/bookings \
+# Start a trip booking saga (requires JWT via API Gateway)
+curl -X POST http://localhost:8085/bookings \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access_token>" \
   -d '{"customerName": "John Doe", "destination": "Paris", "amount": 1500.00}'
 
 # Get saga by ID
-curl http://localhost:8080/bookings/550e8400-e29b-41d4-a716-446655440000
+curl http://localhost:8085/bookings/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer <access_token>"
 
 # List all sagas
-curl http://localhost:8080/bookings
+curl http://localhost:8085/bookings \
+  -H "Authorization: Bearer <access_token>"
 
 # Health check
-curl http://localhost:8080/actuator/health
+curl http://localhost:8085/actuator/health
 ```
 
 ---
@@ -209,7 +212,7 @@ See `.env.example` for all required variables with descriptions.
 docker compose up -d --build
 ```
 
-Verify: `curl http://localhost:8080/actuator/health` -> `{"status":"UP"}`
+Verify: `curl http://localhost:8085/actuator/health` -> `{"status":"UP"}`
 
 ---
 
@@ -487,7 +490,7 @@ mvn test
 
 | Test | Scenario |
 |------|----------|
-| exception handling | `SagaNotFoundException` -> 404, `InvalidSagaStateException` -> 409, validation errors -> 400 |
+| exception handling | All handlers return `ProblemDetail` (RFC 9457): `SagaNotFoundException` -> 404, `InvalidSagaStateException` -> 400, validation errors -> 400, generic -> 500 |
 
 #### Contract Tests
 
@@ -606,7 +609,6 @@ mvn test
 │   │   │   │   └── presentation/
 │   │   │   │       ├── controller/           # BookingController
 │   │   │   │       ├── dto/
-│   │   │   │       │   ├── error/            # ErrorResponseDto
 │   │   │   │       │   ├── request/          # StartTripBookingRequestDto
 │   │   │   │       │   └── response/         # BookingResponseDto,
 │   │   │   │       │                         #   SagaStepResponseDto

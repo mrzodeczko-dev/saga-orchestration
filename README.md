@@ -10,17 +10,38 @@ Monorepo for a distributed trip booking system implementing the **Saga Orchestra
 
 | Service | Port | Role | Description |
 |---------|------|------|-------------|
+| **API Gateway** | 8085 | Security | JWT validation, RBAC, rate limiting (Bucket4j + Redis), circuit breaker (Resilience4j), request forwarding |
+| **Auth Service** | 8084 | Security | Login, MFA (TOTP), JWT token pair with rotation and reuse detection, server-side revocation via Redis |
+| **User Service** | 8086 | Security | Registration, email activation, password reset, MFA setup, role management |
 | **Booking Service** | 8080 | Orchestrator | Starts sagas, tracks step state, dispatches commands, handles replies, triggers compensation |
 | **Flight Service** | 8081 | Participant | Reserves / cancels seat reservations per saga |
 | **Hotel Service** | 8082 | Participant | Reserves / cancels cabin reservations per saga |
 | **Payment Service** | 8083 | Participant | Charges / refunds payments per saga |
+
+> **Note:** Only the API Gateway (port 8085) is exposed externally. All other services communicate internally via the Docker network. Booking endpoints require a valid JWT token.
 
 ## Architecture
 
 ```mermaid
 graph TD
     Client(["🖥️ Client"])
-    Client -- "POST /bookings" --> API
+    Client -- "POST /bookings<br/>(Bearer JWT)" --> GW
+
+    subgraph SEC["🔐 Security Platform"]
+        GW["🛡️ API Gateway :8085<br/>JWT · RBAC · Rate Limit"]
+        AUTH["🔑 Auth Service :8084"]
+        USR["👤 User Service :8086"]
+        REDIS[("Redis")]
+        USR_DB[("users_db")]
+    end
+
+    GW -- "/auth/**" --> AUTH
+    GW -- "/users/**" --> USR
+    GW -- "/bookings/**" --> API
+    AUTH --> REDIS
+    GW --> REDIS
+    AUTH --> USR
+    USR --> USR_DB
 
     subgraph ORCH["🟠 Booking Service :8080 — Saga Orchestrator"]
         API["REST API"] --> SAG["Saga Orchestrator"]
@@ -63,6 +84,7 @@ graph TD
     P --- P_DB
 
     style Client fill:#e1f5fe,stroke:#0277bd,color:#000
+    style SEC fill:#e8eaf6,stroke:#283593,color:#000
     style ORCH fill:#fff3e0,stroke:#ef6c00,color:#000
     style MQ fill:#fce4ec,stroke:#c62828,color:#000
     style PART fill:#f3e5f5,stroke:#6a1b9a,color:#000
@@ -114,31 +136,44 @@ All services use the **Transactional Outbox** pattern — messages are persisted
 
 ```bash
 cp .env.example .env
-# Fill in secrets (RabbitMQ passwords, DB passwords)
+# Fill in secrets (RabbitMQ passwords, DB passwords, JWT_SECRET, INTERNAL_SECRET, Redis, SMTP)
 docker compose up -d --build
-curl http://localhost:8080/actuator/health
+curl http://localhost:8085/actuator/health
 ```
 
-### Start a Booking
+### Register & Authenticate
 
 ```bash
-curl -X POST http://localhost:8080/bookings \
+# Register a new user
+curl -X POST http://localhost:8085/users \
   -H "Content-Type: application/json" \
+  -d '{"email":"john@example.com","password":"Secret123!","firstName":"John","lastName":"Doe"}'
+
+# Activate account (use code from email)
+curl -X POST http://localhost:8085/users/activation \
+  -H "Content-Type: application/json" \
+  -d '{"email":"john@example.com","code":"123456"}'
+
+# Login (returns access + refresh token)
+curl -X POST http://localhost:8085/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"john@example.com","password":"Secret123!"}'
+```
+
+### Start a Booking (requires JWT)
+
+```bash
+curl -X POST http://localhost:8085/bookings \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access_token>" \
   -d '{"customerName":"John","destination":"Mars","amount":9999.99}'
 ```
 
 ### Check Saga Status
 
 ```bash
-curl http://localhost:8080/bookings/{sagaId}
-```
-
-### Check Participant State
-
-```bash
-curl http://localhost:8081/reservations/{sagaId}   # Flight
-curl http://localhost:8082/reservations/{sagaId}   # Hotel
-curl http://localhost:8083/payments/{sagaId}        # Payment
+curl http://localhost:8085/bookings/{sagaId} \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ## Repository Structure
@@ -202,8 +237,8 @@ saga-orchestration/
 │   ├── ci.yml                         # Unit & contract tests (4 services)
 │   ├── e2e.yml                        # End-to-end tests (Docker Compose)
 │   └── dockerhub-publish-images.yml   # Publish Docker images after E2E pass
-├── docker-compose.yml                 # Full stack (4 MySQL + 3 RabbitMQ + 4 services)
-├── .env.example                       # All environment variables
+├── docker-compose.yml                 # Full stack (5 MySQL + 3 RabbitMQ + Redis + 7 services)
+├── .env.example                       # All environment variables (saga + security platform)
 └── .gitignore
 ```
 
@@ -227,6 +262,9 @@ The project uses three GitHub Actions workflows. **`ci.yml`** has two jobs: **Fl
 | Validation | Spring Boot Starter Validation (Hibernate Validator) |
 | Code Coverage | JaCoCo 0.8.13 (80% line coverage gate) |
 | Integration Testing | Testcontainers (MySQL, RabbitMQ), Awaitility |
+| Security | JWT (access + refresh tokens), RBAC, MFA (TOTP), rate limiting (Bucket4j + Redis), circuit breaker (Resilience4j) |
+| API Gateway | Custom Spring Boot gateway with JWT validation, request forwarding, internal secret header |
+| Error Handling | RFC 9457 ProblemDetail (application/problem+json) |
 | Observability | Spring Boot Actuator |
 | Build | Maven 3.9, multi-stage Docker build with CDS extraction |
 | Containerisation | Docker, Docker Compose v2+ |

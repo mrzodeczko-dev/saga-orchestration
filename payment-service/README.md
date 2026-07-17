@@ -8,7 +8,7 @@
 
 When the orchestrator dispatches a `RESERVE` command, the Payment Service **charges** the customer. When a `CANCEL` command arrives (during compensation), it **refunds** the previously charged payment. All operations are **idempotent** -- duplicate commands are safely ignored via the processed message store. Replies flow back to the orchestrator through the **Transactional Outbox** pattern, guaranteeing at-least-once delivery without distributed transactions.
 
-The service runs on port **8083**, uses **MySQL** for persistence, communicates via **RabbitMQ**, and follows **Hexagonal Architecture** (Ports & Adapters).
+The service runs on internal port **8083** (not exposed externally -- accessible only through the API Gateway), uses **MySQL** for persistence, communicates via **RabbitMQ**, and follows **Hexagonal Architecture** (Ports & Adapters).
 
 [Back to Table of Contents](#toc)
 
@@ -502,7 +502,6 @@ payment-service/
 │   │   └── presentation/
 │   │       ├── controller/                 PaymentController
 │   │       ├── dto/
-│   │       │   ├── error/                  ErrorResponseDto
 │   │       │   └── response/               PaymentResponseDto
 │   │       └── exception/                  GlobalExceptionHandler
 │   ├── main/resources/
