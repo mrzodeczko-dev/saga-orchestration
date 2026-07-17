@@ -69,7 +69,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
                 .get("sagaId").asText();
 
         // Saga persisted in DB
-        SagaInstanceEntity entity = jpaSagaInstanceRepository.findById(UUID.fromString(sagaId))
+        SagaInstanceEntity entity = jpaSagaInstanceRepository.findByIdWithSteps(UUID.fromString(sagaId))
                 .orElseThrow();
         assertThat(entity.getCustomerName()).isEqualTo("Jan Kowalski");
         assertThat(entity.getDestination()).isEqualTo("Bali");
@@ -196,7 +196,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
 
         // Wait for saga to process and create HOTEL_RESERVE outbox event
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getSteps().stream()
                     .filter(s -> s.getName().name().equals("FLIGHT"))
                     .findFirst().orElseThrow().getStatus().name())
@@ -207,7 +207,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
         sendReply(sagaUuid, "HOTEL", "RESERVE", "SUCCESS", null);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getSteps().stream()
                     .filter(s -> s.getName().name().equals("HOTEL"))
                     .findFirst().orElseThrow().getStatus().name())
@@ -219,7 +219,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
 
         // Saga should complete
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getStatus().name()).isEqualTo("COMPLETED");
         });
     }
@@ -246,7 +246,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
         sendReply(sagaUuid, "FLIGHT", "RESERVE", "SUCCESS", null);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getSteps().stream()
                     .filter(s -> s.getName().name().equals("FLIGHT"))
                     .findFirst().orElseThrow().getStatus().name())
@@ -257,7 +257,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
         sendReply(sagaUuid, "HOTEL", "RESERVE", "FAILURE", "No rooms available");
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getStatus().name()).isEqualTo("COMPENSATING");
         });
 
@@ -265,7 +265,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
         sendReply(sagaUuid, "FLIGHT", "CANCEL", "SUCCESS", null);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getStatus().name()).isEqualTo("CANCELLED");
         });
     }
@@ -291,7 +291,7 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
         // FLIGHT succeeds
         sendReply(sagaUuid, "FLIGHT", "RESERVE", "SUCCESS", null);
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getSteps().stream()
                     .filter(s -> s.getName().name().equals("FLIGHT"))
                     .findFirst().orElseThrow().getStatus().name())
@@ -301,14 +301,14 @@ class SagaFlowIntegrationTest extends IntegrationTestBase {
         // HOTEL fails
         sendReply(sagaUuid, "HOTEL", "RESERVE", "FAILURE", "Overbooked");
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getStatus().name()).isEqualTo("COMPENSATING");
         });
 
         // FLIGHT cancel also fails
         sendReply(sagaUuid, "FLIGHT", "CANCEL", "FAILURE", "Cannot cancel");
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            SagaInstanceEntity saga = jpaSagaInstanceRepository.findById(sagaUuid).orElseThrow();
+            SagaInstanceEntity saga = jpaSagaInstanceRepository.findByIdWithSteps(sagaUuid).orElseThrow();
             assertThat(saga.getStatus().name()).isEqualTo("COMPENSATION_FAILED");
         });
     }
