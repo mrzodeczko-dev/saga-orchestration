@@ -2,13 +2,12 @@ package com.rzodeczko.presentation.exception;
 
 import com.rzodeczko.domain.exception.InvalidSagaStateException;
 import com.rzodeczko.domain.exception.SagaNotFoundException;
-import com.rzodeczko.presentation.dto.error.ErrorResponseDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.ProblemDetail;
 
 import java.util.UUID;
 
@@ -28,17 +27,17 @@ class GlobalExceptionHandlerTest {
     class SagaNotFound {
 
         @Test
-        @DisplayName("should return 404 with saga id in message")
+        @DisplayName("should return 404 with saga id in detail")
         void shouldReturn404() {
             UUID sagaId = UUID.randomUUID();
             SagaNotFoundException ex = new SagaNotFoundException(sagaId);
 
-            ResponseEntity<ErrorResponseDto> response = handler.handle(ex);
+            ProblemDetail problem = handler.handleSagaNotFound(ex);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-            assertThat(response.getBody().status()).isEqualTo(404);
-            assertThat(response.getBody().error()).isEqualTo("Not found");
-            assertThat(response.getBody().message()).contains(sagaId.toString());
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+            assertThat(problem.getTitle()).isEqualTo("Not Found");
+            assertThat(problem.getDetail()).contains(sagaId.toString());
+            assertThat(problem.getType().toString()).isEqualTo("/problems/saga-not-found");
         }
     }
 
@@ -51,11 +50,11 @@ class GlobalExceptionHandlerTest {
         void shouldReturn400ForIllegalArgument() {
             IllegalArgumentException ex = new IllegalArgumentException("bad input");
 
-            ResponseEntity<ErrorResponseDto> response = handler.handle(ex);
+            ProblemDetail problem = handler.handleBadRequest(ex);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-            assertThat(response.getBody().status()).isEqualTo(400);
-            assertThat(response.getBody().message()).isEqualTo("bad input");
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+            assertThat(problem.getTitle()).isEqualTo("Bad Request");
+            assertThat(problem.getDetail()).isEqualTo("bad input");
         }
 
         @Test
@@ -63,10 +62,10 @@ class GlobalExceptionHandlerTest {
         void shouldReturn400ForInvalidSagaState() {
             InvalidSagaStateException ex = new InvalidSagaStateException("invalid state");
 
-            ResponseEntity<ErrorResponseDto> response = handler.handle(ex);
+            ProblemDetail problem = handler.handleBadRequest(ex);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-            assertThat(response.getBody().message()).isEqualTo("invalid state");
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+            assertThat(problem.getDetail()).isEqualTo("invalid state");
         }
     }
 
@@ -75,15 +74,16 @@ class GlobalExceptionHandlerTest {
     class GenericException {
 
         @Test
-        @DisplayName("should return 500 with generic message")
+        @DisplayName("should return 500 with generic message, hiding exception details")
         void shouldReturn500() {
             Exception ex = new Exception("something broke");
 
-            ResponseEntity<ErrorResponseDto> response = handler.handle(ex);
+            ProblemDetail problem = handler.handleUnexpected(ex);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-            assertThat(response.getBody().status()).isEqualTo(500);
-            assertThat(response.getBody().message()).isEqualTo("An unexpected error");
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            assertThat(problem.getTitle()).isEqualTo("Internal Server Error");
+            assertThat(problem.getDetail()).isEqualTo("An unexpected error occurred");
+            assertThat(problem.getDetail()).doesNotContain("something broke");
         }
     }
 }

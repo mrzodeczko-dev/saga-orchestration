@@ -2,11 +2,9 @@ package com.rzodeczko.presentation.exception;
 
 import com.rzodeczko.domain.exception.InvalidSagaStateException;
 import com.rzodeczko.domain.exception.SagaNotFoundException;
-import com.rzodeczko.presentation.dto.error.ErrorResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,50 +18,58 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    private static final String PROBLEM_BASE = "/problems/";
+
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     public ProblemDetail handleBadInput(Exception e) {
         log.warn("Malformed request: {}", e.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "Malformed request body or parameter");
-        problem.setType(URI.create("https://api.rzodeczko.com/problems/malformed-request"));
+        problem.setTitle("Bad Request");
+        problem.setType(URI.create(PROBLEM_BASE + "malformed-request"));
         return problem;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponseDto> handle(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult()
+    public ProblemDetail handleValidation(MethodArgumentNotValidException e) {
+        String detail = e.getBindingResult()
                 .getFieldErrors()
                 .stream()
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
-                .collect(Collectors.joining(" "));
+                .collect(Collectors.joining("; "));
 
-        log.warn("Validation failed: {}", message);
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponseDto(400, "Validation failed", message));
+        log.warn("Validation failed: {}", detail);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setTitle("Validation Failed");
+        problem.setType(URI.create(PROBLEM_BASE + "validation-error"));
+        return problem;
     }
 
     @ExceptionHandler(SagaNotFoundException.class)
-    public ResponseEntity<ErrorResponseDto> handle(SagaNotFoundException e) {
+    public ProblemDetail handleSagaNotFound(SagaNotFoundException e) {
         log.warn("Saga not found: {}", e.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponseDto(404, "Not found", e.getMessage()));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problem.setTitle("Not Found");
+        problem.setType(URI.create(PROBLEM_BASE + "saga-not-found"));
+        return problem;
     }
 
     @ExceptionHandler({IllegalArgumentException.class, InvalidSagaStateException.class})
-    public ResponseEntity<ErrorResponseDto> handle(RuntimeException e) {
+    public ProblemDetail handleBadRequest(RuntimeException e) {
         log.warn("Bad request: {}", e.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponseDto(400, "Bad request", e.getMessage()));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        problem.setTitle("Bad Request");
+        problem.setType(URI.create(PROBLEM_BASE + "bad-request"));
+        return problem;
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponseDto> handle(Exception e) {
+    public ProblemDetail handleUnexpected(Exception e) {
         log.error("Unexpected error", e);
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponseDto(500, "Internal server error", "An unexpected error"));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+        problem.setTitle("Internal Server Error");
+        problem.setType(URI.create(PROBLEM_BASE + "internal-error"));
+        return problem;
     }
 }

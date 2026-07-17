@@ -4,9 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-
-import com.rzodeczko.presentation.dto.error.ErrorResponseDto;
+import org.springframework.http.ProblemDetail;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,14 +22,12 @@ class GlobalExceptionHandlerTest {
         void mapsToBadRequest() {
             IllegalArgumentException exception = new IllegalArgumentException("invalid input");
 
-            ResponseEntity<ErrorResponseDto> response = handler.handle(exception);
+            ProblemDetail problem = handler.handleBadRequest(exception);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().status()).isEqualTo(400);
-            assertThat(response.getBody().error()).isEqualTo("Bad Request");
-            assertThat(response.getBody().message()).isEqualTo("invalid input");
-            assertThat(response.getBody().timestamp()).isNotNull();
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+            assertThat(problem.getTitle()).isEqualTo("Bad Request");
+            assertThat(problem.getDetail()).isEqualTo("invalid input");
+            assertThat(problem.getType().toString()).isEqualTo("/problems/bad-request");
         }
     }
 
@@ -44,14 +40,12 @@ class GlobalExceptionHandlerTest {
         void mapsToInternalServerError() {
             Exception exception = new RuntimeException("some sensitive internal detail");
 
-            ResponseEntity<ErrorResponseDto> response = handler.handle(exception);
+            ProblemDetail problem = handler.handleUnexpected(exception);
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().status()).isEqualTo(500);
-            assertThat(response.getBody().error()).isEqualTo("Internal Server Error");
-            assertThat(response.getBody().message()).isEqualTo("Unexpected error");
-            assertThat(response.getBody().message()).doesNotContain("some sensitive internal detail");
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            assertThat(problem.getTitle()).isEqualTo("Internal Server Error");
+            assertThat(problem.getDetail()).isEqualTo("An unexpected error occurred");
+            assertThat(problem.getDetail()).doesNotContain("some sensitive internal detail");
         }
     }
 }
