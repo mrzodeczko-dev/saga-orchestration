@@ -23,36 +23,55 @@ Monorepo for a distributed trip booking system implementing the **Saga Orchestra
 ## Architecture
 
 ```mermaid
-graph TD
-    Client(["🖥️ Client"])
-    Client -- "POST /bookings<br/>(Bearer JWT)" --> GW
+graph TB
+    Client(["🖥️ Client<br/>:8085 — only exposed port"])
+
+    Client -- "Bearer JWT" --> GW
 
     subgraph SEC["🔐 Security Platform"]
-        GW["🛡️ API Gateway :8085<br/>JWT · RBAC · Rate Limit"]
-        AUTH["🔑 Auth Service :8084"]
-        USR["👤 User Service :8086"]
-        REDIS[("Redis")]
-        USR_DB[("users_db")]
+        direction LR
+
+        subgraph SEC_GATE[" "]
+            direction TB
+            GW["🛡️ API Gateway :8085<br/>JWT Validation · RBAC · Rate Limiting<br/>Circuit Breaker · Request Forwarding"]
+        end
+
+        subgraph SEC_SERVICES[" "]
+            direction TB
+            AUTH["🔑 Auth Service :8084<br/>Login · MFA (TOTP)<br/>Token Rotation · Revocation"]
+            USR["👤 User Service :8086<br/>Registration · Activation<br/>Password Reset · Roles"]
+        end
+
+        subgraph SEC_DATA[" "]
+            direction TB
+            REDIS[("Redis<br/>JWT sessions<br/>Rate limit buckets")]
+            USR_DB[("users_db")]
+        end
     end
 
     GW -- "/auth/**" --> AUTH
     GW -- "/users/**" --> USR
-    GW -- "/bookings/**" --> API
+    AUTH --> USR
     AUTH --> REDIS
     GW --> REDIS
-    AUTH --> USR
     USR --> USR_DB
 
+    GW -- "/bookings/**" --> API
+
     subgraph ORCH["🟠 Booking Service :8080 — Saga Orchestrator"]
-        API["REST API"] --> SAG["Saga Orchestrator"]
-        SAG --> OB1[("Transactional Outbox")]
+        direction LR
+        API["REST API"]
+        SAG["Saga Orchestrator"]
+        OB1[("Transactional<br/>Outbox")]
+        API --> SAG --> OB1
     end
 
     OB1 -. "commands" .-> CMD
 
-    subgraph MQ["🔴 RabbitMQ Cluster · 3 quorum-queue nodes"]
-        CMD["x.saga.commands"]
-        RPL["x.saga.replies"]
+    subgraph MQ["🔴 RabbitMQ Cluster · 3 Quorum-Queue Nodes"]
+        direction LR
+        CMD["📤 x.saga.commands<br/>(direct exchange)"]
+        RPL["📥 x.saga.replies<br/>(direct exchange)"]
     end
 
     RPL -. "saga.reply" .-> SAG
@@ -62,9 +81,10 @@ graph TD
     CMD -- "payment.command" --> P
 
     subgraph PART["🟣 Saga Participants — Hexagonal Architecture · Idempotent Consumers · Transactional Outbox"]
-        F["✈️ Flight Service :8081"]
-        H["🏨 Hotel Service :8082"]
-        P["💳 Payment Service :8083"]
+        direction LR
+        F["✈️ Flight Service<br/>:8081"]
+        H["🏨 Hotel Service<br/>:8082"]
+        P["💳 Payment Service<br/>:8083"]
     end
 
     F -. "reply" .-> RPL
@@ -72,6 +92,7 @@ graph TD
     P -. "reply" .-> RPL
 
     subgraph DATA["🗄️ Per-Service MySQL · Liquibase Migrations"]
+        direction LR
         B_DB[("booking_db")]
         F_DB[("flight_db")]
         H_DB[("hotel_db")]
@@ -83,8 +104,16 @@ graph TD
     H --- H_DB
     P --- P_DB
 
-    style Client fill:#e1f5fe,stroke:#0277bd,color:#000
+    style Client fill:#e1f5fe,stroke:#0277bd,color:#000,font-size:14px
     style SEC fill:#e8eaf6,stroke:#283593,color:#000
+    style SEC_GATE fill:transparent,stroke:none
+    style SEC_SERVICES fill:transparent,stroke:none
+    style SEC_DATA fill:transparent,stroke:none
+    style GW fill:#c5cae9,stroke:#1a237e,color:#000
+    style AUTH fill:#d1c4e9,stroke:#4a148c,color:#000
+    style USR fill:#c8e6c9,stroke:#1b5e20,color:#000
+    style REDIS fill:#ffcdd2,stroke:#b71c1c,color:#000
+    style USR_DB fill:#ffcdd2,stroke:#b71c1c,color:#000
     style ORCH fill:#fff3e0,stroke:#ef6c00,color:#000
     style MQ fill:#fce4ec,stroke:#c62828,color:#000
     style PART fill:#f3e5f5,stroke:#6a1b9a,color:#000

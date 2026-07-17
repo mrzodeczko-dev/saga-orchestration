@@ -342,7 +342,7 @@ graph TB
 | **Domain** | Core business logic, entities, value objects | `Payment`, `ChargeOutcome`, `PaymentStatus` |
 | **Application** | Use cases, ports (interfaces), DTOs, orchestration | `PaymentCommandService`, `PaymentQueryServiceImpl`, `ProcessPaymentCommandUseCase`, `GetPaymentUseCase`, `SagaReplyPort`, `PaymentRepository`, `ProcessedMessageStore` |
 | **Infrastructure** | Adapters for messaging, persistence, outbox, idempotency, transactions | `PaymentCommandListener`, `OutboxSagaReplyPublisher`, `PaymentRepositoryAdapter`, `ProcessedMessageStoreAdapter`, `OutboxEventPublisher`, `OutboxEventService`, `TransactionalPaymentCommandService`, `TransactionalPaymentQueryService` |
-| **Presentation** | REST controllers, response DTOs, exception handling | `PaymentController`, `PaymentResponseDto`, `GlobalExceptionHandler` |
+| **Presentation** | REST controllers, response DTOs, RFC 9457 ProblemDetail error handling | `PaymentController`, `PaymentResponseDto`, `GlobalExceptionHandler` |
 
 ### Ports
 
@@ -451,7 +451,7 @@ Tests include **unit tests** (JUnit 5 + Mockito), **contract tests** (Spring Clo
 |------------|----------|
 | `PaymentControllerTest` | REST endpoint routing, response codes, serialization |
 | `PaymentResponseDtoTest` | Response DTO structure |
-| `GlobalExceptionHandlerTest` | Exception-to-HTTP-response mapping |
+| `GlobalExceptionHandlerTest` | Exception-to-ProblemDetail (RFC 9457) mapping |
 
 ### Contract Tests (Spring Cloud Contract)
 

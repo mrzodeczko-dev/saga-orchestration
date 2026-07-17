@@ -188,7 +188,7 @@ mvn clean package -DskipTests
 java -jar target/*.jar
 ```
 
-The service starts on **port 8082** by default.
+The service starts on internal port **8082** by default (not exposed externally -- accessible only through the API Gateway).
 
 ### Build Docker Image
 
