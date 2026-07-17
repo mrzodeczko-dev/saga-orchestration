@@ -25,5 +25,7 @@ public interface JpaSagaInstanceRepository extends JpaRepository<SagaInstanceEnt
     Optional<SagaInstanceEntity> findByIdWithSteps(@Param("id") UUID id);
 
     @EntityGraph(attributePaths = "steps")
+    @Query(value = "select s from SagaInstanceEntity s",
+           countQuery = "select count(s) from SagaInstanceEntity s")
     Page<SagaInstanceEntity> findAllWithSteps(Pageable pageable);
 }
