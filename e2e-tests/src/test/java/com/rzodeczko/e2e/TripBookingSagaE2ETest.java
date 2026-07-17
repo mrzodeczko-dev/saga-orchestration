@@ -150,7 +150,7 @@ class TripBookingSagaE2ETest {
         .when()
                 .get("/bookings")
         .then()
-                .extract().jsonPath().getList("$");
+                .extract().jsonPath().getList("content");
 
         assertThat(bookings).isNotEmpty();
     }
