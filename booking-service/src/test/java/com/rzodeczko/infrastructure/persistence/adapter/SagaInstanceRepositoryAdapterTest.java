@@ -63,7 +63,7 @@ class SagaInstanceRepositoryAdapterTest {
         void shouldUpdateExistingEntity() {
             SagaInstance saga = createSaga();
             SagaInstanceEntity existing = SagaInstanceEntity.builder().id(SAGA_ID).build();
-            when(jpaRepository.findById(SAGA_ID)).thenReturn(Optional.of(existing));
+            when(jpaRepository.findByIdWithSteps(any(UUID.class))).thenReturn(Optional.of(existing));
 
             adapter.save(saga);
 
@@ -77,7 +77,7 @@ class SagaInstanceRepositoryAdapterTest {
         void shouldCreateNewEntity() {
             SagaInstance saga = createSaga();
             SagaInstanceEntity newEntity = SagaInstanceEntity.builder().id(SAGA_ID).build();
-            when(jpaRepository.findById(SAGA_ID)).thenReturn(Optional.empty());
+            when(jpaRepository.findByIdWithSteps(any(UUID.class))).thenReturn(Optional.empty());
             when(mapper.toNewEntity(saga)).thenReturn(newEntity);
 
             adapter.save(saga);
@@ -97,7 +97,7 @@ class SagaInstanceRepositoryAdapterTest {
         void shouldReturnMappedDomain() {
             SagaInstance saga = createSaga();
             SagaInstanceEntity entity = SagaInstanceEntity.builder().id(SAGA_ID).build();
-            when(jpaRepository.findById(SAGA_ID)).thenReturn(Optional.of(entity));
+            when(jpaRepository.findByIdWithSteps(any(UUID.class))).thenReturn(Optional.of(entity));
             when(mapper.toDomain(entity)).thenReturn(saga);
 
             Optional<SagaInstance> result = adapter.findById(SAGA_ID);
@@ -108,7 +108,7 @@ class SagaInstanceRepositoryAdapterTest {
         @Test
         @DisplayName("should return empty when not found")
         void shouldReturnEmpty() {
-            when(jpaRepository.findById(SAGA_ID)).thenReturn(Optional.empty());
+            when(jpaRepository.findByIdWithSteps(any(UUID.class))).thenReturn(Optional.empty());
 
             assertThat(adapter.findById(SAGA_ID)).isEmpty();
         }
@@ -123,7 +123,7 @@ class SagaInstanceRepositoryAdapterTest {
         void shouldDelegateToPessimisticLock() {
             SagaInstance saga = createSaga();
             SagaInstanceEntity entity = SagaInstanceEntity.builder().id(SAGA_ID).build();
-            when(jpaRepository.findByIdForUpdate(SAGA_ID)).thenReturn(Optional.of(entity));
+            when(jpaRepository.findByIdForUpdate(any(UUID.class))).thenReturn(Optional.of(entity));
             when(mapper.toDomain(entity)).thenReturn(saga);
 
             Optional<SagaInstance> result = adapter.findByIdForUpdate(SAGA_ID);
